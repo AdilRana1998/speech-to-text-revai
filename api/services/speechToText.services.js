@@ -49,6 +49,9 @@ const ALLOWED_FILE_TYPES = {
     ]
 };
 
+const mime = require('mime-types');
+
+
 SpeechToText.convertVoice = async (attachment, analysis, userId) => {
     try {
         if (attachment && analysis) {
@@ -171,38 +174,44 @@ SpeechToText.sendFile = async () => {
             console.log("****************************************");
             console.log("Job Started For Pending Files For Rev AI");
             console.log("****************************************");
-            const url = urlBe.replace(/\/api\/?$/, "")
-            const directory = url + revGlobalPath
+            console.log("directory", data);
             for (const element of data) {
-                const completePath = directory + '/' + element.requestUuid + '/' + element.fileName
-                // console.log("url", completePath);
-                const list = {
-                    source_config: {
-                        url: completePath
-                    },
-                    metadata: 'submitted from kolabrya',
-                    language: 'en'
-                }
-                const record = await submitFileRev(list)
-                // console.log("record", record);
-                Logger.data.RevAI({ request: list, response: record, requestUuid: element.requestUuid, userId: element.userId, methodName: "sendFile" }, "Submit-A-File-For-Transcription-RevAI");
-                if (record.id && record.status === 'in_progress') {
-                    const obj = {
-                        transcriptId: record.id,
-                        status: 0,
-                        isSent: 1,
-                        jsonResponse: JSON.stringify(record)
+                const getFileUrl = await SpeechToText.generateAzureInvestigationFileUrl('', '', element.filePath)
+                if (getFileUrl?.statusCode == '200' && getFileUrl?.obj?.videoUrl) {
+                    const list = {
+                        source_config: {
+                            url: getFileUrl?.obj?.videoUrl
+                        },
+                        metadata: 'submitted from kolabrya',
+                        language: 'en'
                     }
-                    await SpeechToTextQueries.update(obj, element.requestUuid, element.userId);
+                    const record = await submitFileRev(list)
+                    console.log("record", record);
+                    Logger.data.RevAI({ request: list, response: record, requestUuid: element.requestUuid, userId: element.userId, methodName: "sendFile" }, "Submit-A-File-For-Transcription-RevAI");
+                    if (record.id && record.status === 'in_progress') {
+                        const obj = {
+                            transcriptId: record.id,
+                            status: 0,
+                            isSent: 1,
+                            jsonResponse: JSON.stringify(record)
+                        }
+                        await SpeechToTextQueries.update(obj, element.requestUuid, element.userId);
+                    } else {
+                        slack.webhook(JSON.stringify({ action: "Failed To Upload File On Rev AI", request: list, response: record, requestUuid: element.requestUuid, userId: element.userId }));
+                        const obj = {
+                            transcriptId: record.id,
+                            status: 2,
+                            isSent: 1,
+                            jsonResponse: JSON.stringify(record)
+                        }
+                        await SpeechToTextQueries.update(obj, element.requestUuid, element.userId);
+                    }
                 } else {
-                    slack.webhook(JSON.stringify({ action: "Failed To Upload File On Rev AI", request: list, response: record, requestUuid: element.requestUuid, userId: element.userId }));
                     const obj = {
-                        transcriptId: record.id,
-                        status: 2,
-                        isSent: 1,
-                        jsonResponse: JSON.stringify(record)
+                        status: 2
                     }
                     await SpeechToTextQueries.update(obj, element.requestUuid, element.userId);
+                    slack.webhook(JSON.stringify({ action: "Error while generating SAAS URL for file upload at azure for Rev AI", response: getFileUrl, requestUuid: element.requestUuid, userId: element.userId }));
                 }
             }
             console.log("**************************************");
@@ -235,6 +244,7 @@ SpeechToText.sendFile = async () => {
     }
 }
 
+
 SpeechToText.getFile = async () => {
     try {
         const data = await SpeechToTextQueries.getPendingUploadedFiles();
@@ -244,7 +254,6 @@ SpeechToText.getFile = async () => {
             console.log("*****************************************");
             for (const element of data) {               
                 const record = await getSubmittedFileRev(element.transcriptId)
-                // console.log("record 1", record);
                 Logger.data.RevAI({ request: element.transcriptId, response: record, requestUuid: element.requestUuid, userId: element.userId, methodName: "getFile" }, "Get-Submitted-File-For-Transcription-RevAI");
                 if (record.id && record.status === 'transcribed') {
                     const obj = {
@@ -704,6 +713,53 @@ SpeechToText.addFile = async (caseFiles, userId) => {
         console.log("Error in adding file in investigation case:", error);
         return {
             message: Strings.ERROR.SOME_THING_WENT_WRONG,
+            statusCode: 400,
+            obj: {
+                error: error.message
+            }
+        }
+    }
+}
+
+SpeechToText.generateAzureInvestigationFileUrl = async (start, end, fileName) => {
+    try {
+        const startsOn = new Date(); // current time
+        const startTime = new Date();
+        const endTime = new Date();
+        const durationMs = endTime - startTime;
+        const totalDurationWithBuffer = durationMs + (60 * 60 * 1000);
+        const expiresOn = new Date(startsOn.getTime() + totalDurationWithBuffer);
+        const blobClient = externalDocContainerClient.getBlobClient(fileName);
+        const exists = await blobClient.exists();
+        if (exists) {
+            await blobClient.setHTTPHeaders({
+                blobContentDisposition: "inline",
+            });
+            const sasToken = generateBlobSASQueryParameters({
+                containerName: CONTAINER_NAME,
+                blobName: fileName,
+                permissions: BlobSASPermissions.parse("r"), // read-only
+                startsOn,
+                expiresOn,
+            }, blobServiceClient.credential).toString();
+            const videoUrl = `${blobClient.url}?${sasToken}`
+            return {
+                message: Strings.SUCCESS,
+                statusCode: 200,
+                obj: {
+                    videoUrl: videoUrl
+                }
+            }
+        } else {
+            return {
+                message: Strings.ROOM.EMPTY,
+                statusCode: 200,
+                obj: {}
+            }
+        }
+    } catch (error) {
+        console.log('An error occurred while generate Azure file Url for Rev AI:', error);
+        return {
             statusCode: 400,
             obj: {
                 error: error.message
