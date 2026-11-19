@@ -377,6 +377,7 @@ SpeechToText.getAll = async (userId) => {
         if (data.length > 0) {
             const processedResults = data.map(item => {
                 item.createdAt = moment(item.createdAt).format('MM/DD/YYYY')
+                item.status = item.status === 0 ? 'In Progress' : item.status === 1 ? 'Completed' : item.status === 2 ? 'Failed' : 'Unknown'
                 return {
                     ...item,
                 };
@@ -415,7 +416,8 @@ SpeechToText.getAllByRequestUuid = async (requestUuid, userId) => {
                 const completePath = directory + '/' + requestUuid + '/' + data[0].fileName
                 const processedResults = data.map(item => {
                     item.createdAt = moment(item.createdAt).format('MM/DD/YYYY')
-                    item.url = completePath
+                    // item.url = completePath
+                    item.status = item.status === 0 ? 'In Progress' : item.status === 1 ? 'Completed' : item.status === 2 ? 'Failed' : 'Unknown'
                     return {
                         ...item,
                     };
@@ -674,7 +676,7 @@ SpeechToText.addFile = async (caseFiles, userId) => {
                 };
                 const list = await SpeechToTextQueries.createFile(fileData);
                 if (list) {
-                    entries.push(list.id)
+                    entries.push({fileName: file.fileName, requestUuid: list.requestUuid});
                 } else {
                     return {
                         message: Strings.ERROR.SOME_THING_WENT_WRONG,
@@ -685,13 +687,13 @@ SpeechToText.addFile = async (caseFiles, userId) => {
                     };
                 }
             }
-
             if (entries?.length === caseFiles?.length) {
                 return {
                     message: Strings.SUCCESS,
                     statusCode: 200,
                     obj: {
-                        message: Strings.ASSISTANT.ASSISTANT_THREAD_SUCCESS
+                        message: Strings.ASSISTANT.ASSISTANT_THREAD_SUCCESS,
+                        data: entries
                     }
                 };
             } else {

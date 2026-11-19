@@ -729,7 +729,7 @@ if (process.env.BP_MEETING_SCHEDULE === 'true') {
     console.log("not running for getting json assistant");
 }
 
-if (process.env.BP_MEETING_SCHEDULE === 'true') {
+if (process.env.BP_MEETING_SCHEDULE === 'false') {
     cron.schedule("*/15 * * * * *", async function () {
         try {
             if (flags.revTranscript) {

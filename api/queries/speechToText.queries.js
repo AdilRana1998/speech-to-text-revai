@@ -3,8 +3,8 @@ const dbModel = require('../model');
 const Op = dbModel.op;
 const db = dbModel.speechToText;
 const attributes_1 = ['requestUuid', 'fileName', 'filePath', 'status']
-const attributes_2 = ['requestUuid', 'transcriptName', 'status', 'createdAt']
-const attributes_3 = ['requestUuid', 'transcriptName', 'status', 'createdAt', 'transcript', 'fileName']
+const attributes_2 = ['requestUuid', 'status', 'createdAt', 'transcript', 'fileName', 'filePath']
+const attributes_3 = ['requestUuid', 'status', 'createdAt', 'transcript', 'fileName']
 const { Encryption } = require('../../utils')
 const { Sequelize } = require("sequelize");
 
