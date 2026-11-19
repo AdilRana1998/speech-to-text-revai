@@ -505,11 +505,11 @@ UserServices.postUser = async (obj = {}) => {
     obj.expiryToken = Functions.getTokenExpiry();
     obj.refreshTokenExpiry = Functions.getTokenExpiry();
     obj.email = obj.email.toLowerCase()
-    obj.isRemoved = true //comment this line to enable access grant logic
+    obj.isRemoved = false //comment this line to enable access grant logic
     var response = await UserQueries.getUsersByEmail(obj.email);
     if (response.length === 0) {
         try {
-            slack.webhook(JSON.stringify({ action: "Signed Up", timestamp: new Date(), email: obj.email }));
+            // slack.webhook(JSON.stringify({ action: "Signed Up", timestamp: new Date(), email: obj.email }));
         } catch (e) {
             console.log("slackPostError", e.message);
         }

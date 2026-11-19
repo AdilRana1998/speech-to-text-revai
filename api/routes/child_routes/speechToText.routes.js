@@ -20,5 +20,12 @@ router.get('/voice/delete/:requestUuid', [middleware.authValidation], speechToTe
 router.post('/voice/edit', [middleware.authValidation], speechToText.editByRequestUuid);
 router.get('/voice/download-transcript/:requestUuid', [middleware.authValidation], speechToText.downloadTranscript);
 
+//Blob routes
+
+router.post('/voice/presigned-urls', [middleware.authValidation], speechToText.presignedUrls);
+router.post('/voice/add-file', [middleware.authValidation], speechToText.addFile);
+
+
+
 module.exports = router;
  

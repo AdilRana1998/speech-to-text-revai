@@ -17,18 +17,6 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.INTEGER,
             allowNull: false,
         },
-        transcriptName: {
-            type: DataTypes.STRING,
-            allowNull: false,
-            get() {
-                const rawValue = this.getDataValue('transcriptName') ?? '';
-                return Encryptions.decryptSensitiveData(rawValue);
-            },
-            set(value) {
-                const transformedData = Encryptions.encryptSensitiveData(value);
-                this.setDataValue('transcriptName', transformedData);
-            }
-        },
         fileName: {
             type: DataTypes.STRING,
             allowNull: false,

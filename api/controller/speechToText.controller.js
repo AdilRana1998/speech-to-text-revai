@@ -10,7 +10,9 @@ const {
     uploadFile,
     sendFile,
     getFile,
-    getAll
+    getAll,
+    presignedUrls,
+    addFile
 } = require('../services/speechToText.services');
 
 Controller.convert = async (req, res, next) => {
@@ -85,5 +87,22 @@ Controller.downloadTranscript = async (req, res, next) => {
     const result = await downloadTranscript(requestUuid, userId)
     sendStatus.data.sortStatus(res, req, result.obj, result.message, "Download-Transcript-For-User", result.statusCode);    
 }
+
+//
+
+Controller.presignedUrls = async (req, res, next) => {
+    const fileNames = req.body?.files;
+    const userId = req.userId;
+    const result = await presignedUrls(fileNames, userId);
+    sendStatus.data.sortStatus(res, req, result.obj, result.message, "Azure-Blob-Storage-Pre-Signed-Url-Speech-To-Text-Rev-AI", result.statusCode);
+}
+
+Controller.addFile = async (req, res, next) => {
+    const caseFiles = req.body?.caseFiles;
+    const userId = req.userId;
+    const result = await addFile(caseFiles, userId);
+    sendStatus.data.sortStatus(res, req, result.obj, result.message, "Add-File-Speech-To-Text-Rev-AI", result.statusCode);
+}
+
 
 module.exports = Controller;

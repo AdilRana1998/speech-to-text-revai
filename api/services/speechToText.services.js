@@ -22,6 +22,33 @@ const { submitFileRev, getSubmittedFileRev, fetchTranscriptRev } = require('../e
 const moment = require('moment');
 const path = require('path');
 
+//
+
+
+const { containerClient, azureRecallHealth } = require("../../utils/Azure");
+const { PassThrough } = require('stream');
+const { blobServiceClient,
+    externalDocContainerClient,
+    azureExternalDocHealth,
+    generateBlobSASQueryParameters,
+    CONTAINER_NAME,
+    BlobSASPermissions,
+    credentials
+} = require("../../utils/InvestigationExternalDocAzureBlob");
+
+const AZURE_ENABLE = process.env.INVESTIGATION_EXTERNAL_DOC_AZURE_ENABLE;
+const FILE_SIZE_LIMITS = {
+    caseFiles: Number(process.env.CASE_FILE_SIZE) * 1024 * 1024
+};
+let allowedFile = process.env.CASE_FILE_LIMIT;
+const retryLimit = process.env.API_CALL_LIMITS;
+
+const ALLOWED_FILE_TYPES = {
+    caseFiles: [
+        'video/mp4'
+    ]
+};
+
 SpeechToText.convertVoice = async (attachment, analysis, userId) => {
     try {
         if (attachment && analysis) {
@@ -544,5 +571,146 @@ SpeechToText.downloadTranscript = async (requestUuid, userId) => {
         }
     }
 }
+
+//
+
+SpeechToText.presignedUrls = async (files, userId) => {
+    try {
+        if ((files?.length > 0) && AZURE_ENABLE === 'true' && azureExternalDocHealth === true && userId) {
+            if (files?.length <= allowedFile) {
+                const urls = [];
+                for (const file of files) {
+                    const generatedUuid = uuidv4();
+                    const { fileName, mimeType, size, fieldName, pageCount } = file;
+                    // Validate type
+                    if (!ALLOWED_FILE_TYPES[fieldName]?.includes(mimeType)) {
+                        return {
+                            message: Strings.FILE.ACCEPT_FILE_TYPE_ASSISTANT,
+                            statusCode: 400,
+                            obj: {}
+                        };
+                    }
+                    if (size > FILE_SIZE_LIMITS[fieldName]) {
+                        return {
+                            message: Strings.FILE.CASE_DOC_SIZE_LIMIT,
+                            statusCode: 400,
+                            obj: {}
+                        };
+                    }
+                    const blobName = `${generatedUuid}/${fileName}`;
+                    const blockBlobClient = externalDocContainerClient.getBlockBlobClient(blobName);
+                    const sasToken = generateBlobSASQueryParameters(
+                        {
+                            containerName: process.env.INVESTIGATION_EXTERNAL_DOC_CONTAINER,
+                            blobName,
+                            permissions: BlobSASPermissions.parse("cw"), // create+write
+                            expiresOn: new Date(new Date().valueOf() + 15 * 60 * 1000), // 15 min expiry
+                        },
+                        credentials
+                    ).toString();
+                    urls.push({
+                        pageCount,
+                        fileName,
+                        blobPath: blobName,
+                        uploadUrl: `${blockBlobClient.url}?${sasToken}`,
+                        requestUuid: generatedUuid
+                    });
+                }
+                return {
+                    message: Strings.SUCCESS,
+                    statusCode: 200,
+                    obj: {
+                        fileDetails: urls
+                    }
+                };
+            }
+            else {
+                return {
+                    message: Strings.FILE.FILE_UPLOAD_LIMIT_EXCEEDS,
+                    statusCode: 400,
+                    obj: {
+                        message: Strings.FILE.ALLOWED_FILES + (allowedFile) + " Files",
+                    }
+                };
+            }
+        } else {
+            return {
+                message: Strings.UNVALID_STATUS,
+                statusCode: 400,
+                obj: {}
+            };
+        }
+    } catch (error) {
+        console.log("Error in generate Presigned Urls for investigation external doc:", error);
+        return {
+            message: Strings.ERROR.SOME_THING_WENT_WRONG,
+            statusCode: 400,
+            obj: {
+                error: error.message
+            }
+        };
+    }
+};
+
+
+SpeechToText.addFile = async (caseFiles, userId) => {
+    try {
+        if ((caseFiles?.length > 0 && allowedFile) && userId) {
+            const entries = [];
+            for (const file of caseFiles) {
+                const fileData = {
+                    userId: userId,
+                    fileName: file.fileName,
+                    filePath: file.blobPath
+                };
+                const list = await SpeechToTextQueries.createFile(fileData);
+                if (list) {
+                    entries.push(list.id)
+                } else {
+                    return {
+                        message: Strings.ERROR.SOME_THING_WENT_WRONG,
+                        statusCode: 400,
+                        obj: {
+                            list
+                        }
+                    };
+                }
+            }
+
+            if (entries?.length === caseFiles?.length) {
+                return {
+                    message: Strings.SUCCESS,
+                    statusCode: 200,
+                    obj: {
+                        message: Strings.ASSISTANT.ASSISTANT_THREAD_SUCCESS
+                    }
+                };
+            } else {
+                return {
+                    message: Strings.ERROR.SOME_THING_WENT_WRONG,
+                    statusCode: 400,
+                    obj: {}
+                };
+            }
+
+        } else {
+            return {
+                message: Strings.UNVALID_STATUS,
+                statusCode: 400,
+                obj: {}
+            }
+        }
+    } catch (error) {
+        console.log("Error in adding file in investigation case:", error);
+        return {
+            message: Strings.ERROR.SOME_THING_WENT_WRONG,
+            statusCode: 400,
+            obj: {
+                error: error.message
+            }
+        }
+    }
+}
+
 
 module.exports = SpeechToText
