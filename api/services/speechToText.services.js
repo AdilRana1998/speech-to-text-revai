@@ -7,10 +7,10 @@ const {
 const { v4: uuidv4 } = require('uuid');
 const {
     triggerFile
-} = require('./chatGpt.services');
+} = require('./users.services');
 const {
     writeMultipleFile
-} = require('./writeReport.services');
+} = require('./users.services');
 const {
     SpeechToTextQueries
 } = require('../queries');

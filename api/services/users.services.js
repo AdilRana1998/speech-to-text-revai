@@ -9,14 +9,14 @@ const {
     MeetingScheduleQueries,
     CaseFilesQueries
 } = require('../queries');
-const RoomServices = require('./rooms.services')
-const OTPServices = require('./otp.services')
+const RoomServices = require('./users.services')
+const OTPServices = require('./users.services')
 const Imap = require('imap');
 const ICAL = require('ical.js');
 const { simpleParser } = require('mailparser');
-const UserPackageServices = require('./userPackages.services');
+const UserPackageServices = require('./users.services');
 const { slack } = require('../../utils/Webhook');
-const { createActivity } = require('../services/activityLogs.services');
+const { createActivity } = require('../services/users.services');
 const moment = require('moment');
 
 // IMAP configuration

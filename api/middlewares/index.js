@@ -5,7 +5,7 @@ const {
     ActivityLogs,
     KolabryaGrokQueries
 } = require('../queries');
-const { createActivity } = require('../services/activityLogs.services');
+const { createActivity } = require('../services/users.services');
 
 const {
     UserQueries,

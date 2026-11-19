@@ -8,7 +8,6 @@ const {
     UserServices
 } = require('../services')
 const { chat } = require('../external/index');
-const RoomsServices = require('../services/rooms.services');
 
 Controller.getAll = async (req, res, next) => {
     try {
